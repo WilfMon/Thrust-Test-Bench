@@ -21,27 +21,42 @@ const int LOADCELL_SCK_PIN = 2;
 
 void setup() {
   Serial.begin(9600);
+
+  // Wait up to 2 seconds for a configuration signal from Python
+  unsigned long startTime = millis();
+  while (millis() - startTime < 2000) { 
+    if (Serial.available() > 0) {
+      char incomingByte = Serial.read();
+      if (incomingByte == 'Q') {
+        quietMode = true;
+        break; // Exit the loop early since we got our signal
+      }
+    }
+  }
+
   myESC.attach(escPin);
 
-  Serial.println("\n--- Starting ESC Calibration ---");
+  if (!quietMode) {
+    Serial.println("\n--- Starting ESC Calibration ---");
 
-  // 1. Send HIGH throttle signal
-  Serial.println("1. Sending High Throttle (2000ms)...");
-  myESC.writeMicroseconds(2000);
+    // 1. Send HIGH throttle signal
+    Serial.println("1. Sending High Throttle (2000ms)...");
+    myESC.writeMicroseconds(2000);
 
-  // 2. NOW plug in the 12V power supply while this message prints!
-  Serial.println("--> NOW TURN ON/PLUG IN 12V POWER SUPPLY");
-  Serial.println("Waiting 5 seconds for the ESC to register high throttle...");
-  delay(5000);  // It should make a couple of short beeps here
+    // 2. NOW plug in the 12V power supply while this message prints!
+    Serial.println("--> NOW TURN ON/PLUG IN 12V POWER SUPPLY");
+    Serial.println("Waiting 5 seconds for the ESC to register high throttle...");
+    delay(5000);  // It should make a couple of short beeps here
 
-  // 3. Send LOW throttle signal to lock it in
-  Serial.println("2. Sending Low Throttle (1000ms) to Arm...");
-  myESC.writeMicroseconds(1000);
+    // 3. Send LOW throttle signal to lock it in
+    Serial.println("2. Sending Low Throttle (1000ms) to Arm...");
+    myESC.writeMicroseconds(1000);
 
-  Serial.println("Waiting 5 seconds for final arming tones...");
-  delay(5000);  // It should make a long, happy confirmation tone
+    Serial.println("Waiting 5 seconds for final arming tones...");
+    delay(5000);  // It should make a long, happy confirmation tone
 
-  Serial.println("--- Calibration complete ---");
+    Serial.println("--- Calibration complete ---");
+  }
 
   Wire.begin();
 
@@ -101,8 +116,9 @@ void loop() {
       if (valueString == "sweep") {
 
         // Start the test
-        Serial.println("=== Test Running... ===");
-        Serial.println(" _");
+        if (!quietMode) {
+          Serial.println("=== Test Running... ===");
+        }
 
         scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
         scale.set_scale(393);
@@ -166,7 +182,9 @@ void loop() {
         // End the test
         myESC.writeMicroseconds(1000);
 
-        Serial.println("\n=== Test Complete ===");
+        if (!quietMode) {
+          Serial.println("=== Test Complete ===");
+        }
 
       } else if (valueString == "load") {
 
