@@ -2,8 +2,8 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-_8X45 = "data/8X45_1818.csv"
-_10X5E= "data/10X5E_1818.csv"
+_8X45 = "data/Basic_Props/8X45_1818.csv"
+_10X5E= "data/Basic_Props/10X5E_1818.csv"
 
 fig, ax = plt.subplots()
 
@@ -31,7 +31,7 @@ for name, col, data in [("8X45", "blue", _8X45), ("10X5E", "red", _10X5E)]:
         efficiency = np.array(thrust) / np.array(power)
         
     ax.plot(current, voltage, label=name, color=col)
-    ax.set_xlabel("motor speed (A)")
+    ax.set_xlabel("Current (A)")
     ax.set_ylabel("voltage (V)")
 
 ax.legend()

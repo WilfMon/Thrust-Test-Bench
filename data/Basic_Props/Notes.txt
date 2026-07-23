@@ -1,0 +1,23 @@
+-- Tested these props using a A2212/13T 1000KV motor with a bench power supply rated at 12V 25A --
+
+Notes:
+- Limitations:
+    - The propellers were not tested to full power (up to 81% only). This was mainly because the motor mount is made from PLA plastic and 
+    at high speeds the motor gets hotter than 60 degrees. I was worried that the PLA would deform and the test bench
+    might break.
+    - The raw data is noisy with the 10X5E specifically at around 300g to 450g of thrust. This could be because of EMI, Wind or some
+    other sensor misfunction. I correctored for this by implimenting a simple x step moving avarage. I found that satisfactory results
+    could be achived with only a 3 step moving avarage (3SMA).
+
+- Observations
+    - The bigger and higher picth propeller has a higher efficiency at all tested speeds as shown by the graph comparing the efficiencies
+    of the propellers side by side.
+    - The peak efficiencies of the propellers at an arbitrary thrust value of 400g (3SMA):
+        8X45 = 6.65 g/W
+        10X5E = 8.22 g/W
+
+    The 10X5E is 23.6% more efficient at this thrust point
+
+    - The voltage of the powersupply, linearly dropped off as the current drawn by the motor increased. This is shown the the graph of
+    Voltage against Current. I might have to use a LiPo battery in the future to see if the same relationship is observed and if not
+    then switch to a LiPo for all my tests.
