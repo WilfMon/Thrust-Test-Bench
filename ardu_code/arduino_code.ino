@@ -9,32 +9,38 @@ INA226_WE ina226 = INA226_WE(I2C_ADDRESS);
 
 Servo myESC;  // Create a servo object to control the ESC
 HX711 scale;  // Create a scale object
+Servo myServo;  // Create a servo object to control servo
 
 // Values to calculate power draw
 const float supplyVoltage = 12;
 
 const int escPin = 13;
+const int servoPin = 1;
 
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 3;
 const int LOADCELL_SCK_PIN = 2;
+
+bool quietMode = false;
+bool log_ = false;
 
 void setup() {
   Serial.begin(9600);
 
   // Wait up to 2 seconds for a configuration signal from Python
   unsigned long startTime = millis();
-  while (millis() - startTime < 2000) { 
+  while (millis() - startTime < 2000) {
     if (Serial.available() > 0) {
       char incomingByte = Serial.read();
       if (incomingByte == 'Q') {
         quietMode = true;
-        break; // Exit the loop early since we got our signal
+        break;  // Exit the loop early since we got our signal
       }
     }
   }
 
   myESC.attach(escPin);
+  myServo.attach(servoPin);
 
   if (!quietMode) {
     Serial.println("\n--- Starting ESC Calibration ---");
@@ -73,6 +79,39 @@ void setup() {
 
 void loop() {
 
+  // logging for tests
+  if (log_ == true) {
+    // 1. Define how many samples you want to average (e.g., 40 samples)
+    int numSamples = 40;
+
+    float totalCurrent = 0.0;
+    float totalVoltage = 0.0;
+    float totalPower = 0.0;
+
+    // 2. Collect the samples
+    for (int i = 0; i < numSamples; i++) {
+      totalCurrent += ina226.getCurrent_mA();
+      totalVoltage += ina226.getBusVoltage_V();
+
+      // Using getBusPower() / 1000.0 directly from the chip gives you the most accurate power calculation
+      totalPower += (ina226.getBusPower() / 1000.0);
+
+      delay(10);  // Tiny delay between samples to let the sensor refresh
+    }
+
+    // 3. Calculate the averages
+    float averageCurrent_mA = totalCurrent / numSamples;
+    float averageVoltage_V = totalVoltage / numSamples;
+    float averagePower_W = totalPower / numSamples;
+
+    // 4. (Optional) Convert mA to Amps for your final printout
+    float averageCurrent_A = averageCurrent_mA / 1000.0;
+
+    Serial.println(averageCurrent_A);
+    Serial.println(averageVoltage_V);
+    Serial.println(averagePower_W);
+  }
+
   // Check if text has been typed into the Serial Monitor
   if (Serial.available() > 0) {
     // Read the incoming line of text until a newline character
@@ -90,7 +129,33 @@ void loop() {
       Serial.println("--> STOP: Motor Disabled (1000ms)");
     }
 
-    // 2. COMMAND: SPEED [VALUE]
+    else if (inputString == "log true") {
+      log_ = true;
+    }
+
+    else if (inputString == "log false") {
+      log_ = false;
+    }
+
+    // COMMAND: SERVO [VALUE]
+    else if (inputString.startsWith("servo ")) {
+      // Extract the number part after the word "servo "
+      String valueString = inputString.substring(6);
+      int servoValue = valueString.toInt();
+
+      // Bench Safety Caps
+      if (servoValue < 0) servoValue = 0;
+      if (servoValue > 180) {
+        Serial.println("--> Warning: Servo angle capped at 180 degrees for bench safety!");
+        servoValue = 180;
+      }
+
+      myServo.write(servoValue);
+      Serial.println("--> Servo Angle Set To: ");
+      Serial.println(servoValue);
+    }
+
+    // COMMAND: SPEED [VALUE]
     else if (inputString.startsWith("speed ")) {
       // Extract the number part after the word "speed "
       String valueString = inputString.substring(6);
