@@ -8,7 +8,7 @@ def send_command(command_string):
     print(f"Sent: {command_string}")
 
 # for linux, the Arduino is usually connected to /dev/ttyACM0
-arduino_port = "/dev/ttyACM0" 
+arduino_port = "COM3" 
 baud_rate = 9600
 output_file = "tst.csv"
 
@@ -23,7 +23,7 @@ print("Sent Quiet Mode signal to setup()")
 
 # wait for esc calibration and then send the test command
 time.sleep(13)
-send_command("test sweep")
+send_command("test quick")
 
 # Open the CSV file to write data
 with open(output_file, mode='w', newline='') as file:

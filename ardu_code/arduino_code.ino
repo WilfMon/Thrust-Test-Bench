@@ -1,3 +1,4 @@
+
 #include <Servo.h>
 #include "HX711.h"
 #include <Wire.h>
@@ -7,15 +8,15 @@
 
 INA226_WE ina226 = INA226_WE(I2C_ADDRESS);
 
-Servo myESC;  // Create a servo object to control the ESC
-HX711 scale;  // Create a scale object
+Servo myESC;    // Create a servo object to control the ESC
+HX711 scale;    // Create a scale object
 Servo myServo;  // Create a servo object to control servo
 
 // Values to calculate power draw
 const float supplyVoltage = 12;
 
-const int escPin = 13;
-const int servoPin = 1;
+const int escPin = 10;
+const int servoPin = 9;
 
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 3;
@@ -66,15 +67,13 @@ void setup() {
 
   Wire.begin();
 
-  if (!ina226.init()) {
-    Serial.println("Failed to find INA226 chip!");
-    while (1)
-      ;
-  }
+  if (ina226.init()) {
+    Serial.println("Found INA226 chip - Calibrating INA226");
 
-  // calibrate for the 0.002 ohm resistor
-  ina226.setResistorRange(0.002, 20.0);
-  ina226.waitUntilConversionCompleted();
+    // calibrate for the 0.002 ohm resistor
+    ina226.setResistorRange(0.002, 20.0);
+    ina226.waitUntilConversionCompleted();
+  }
 }
 
 void loop() {
@@ -145,13 +144,12 @@ void loop() {
 
       // Bench Safety Caps
       if (servoValue < 0) servoValue = 0;
-      if (servoValue > 180) {
-        Serial.println("--> Warning: Servo angle capped at 180 degrees for bench safety!");
-        servoValue = 180;
+      if (servoValue > 120) {
+        Serial.println("--> Warning: Servo angle capped at 120 degrees");
+        servoValue = 120;
       }
 
       myServo.write(servoValue);
-      Serial.println("--> Servo Angle Set To: ");
       Serial.println(servoValue);
     }
 
@@ -250,6 +248,95 @@ void loop() {
         if (!quietMode) {
           Serial.println("=== Test Complete ===");
         }
+      }
+
+      if (valueString == "quick") {
+
+        // Start the test
+        if (!quietMode) {
+          Serial.println("=== Test Running... ===");
+        }
+
+        scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+        scale.set_scale(393);
+        scale.tare();
+
+        // Loop UP
+        for (int speed = 1080; speed <= 1120; speed += 10) {
+
+          // Check for emergency mid-sweep stop command
+          if (Serial.available() > 0) {
+            String emergency = Serial.readStringUntil('\n');
+            if (emergency.indexOf("st") >= 0) {
+              break;
+            }
+          }
+          myESC.writeMicroseconds(speed);
+
+          for (int servoValue = 20; servoValue <= 50; servoValue += 5) {
+
+            // Check for emergency mid-sweep stop command
+            if (Serial.available() > 0) {
+              String emergency = Serial.readStringUntil('\n');
+              if (emergency.indexOf("st") >= 0) {
+                break;
+              }
+            }
+
+            myServo.write(servoValue);
+
+            delay(400);
+
+            float reading = scale.get_units(40);  // Average of 40 readings
+
+            // 1. Define how many samples you want to average (e.g., 40 samples)
+            int numSamples = 40;
+
+            float totalCurrent = 0.0;
+            float totalVoltage = 0.0;
+            float totalPower = 0.0;
+
+            // 2. Collect the samples
+            for (int i = 0; i < numSamples; i++) {
+              totalCurrent += ina226.getCurrent_mA();
+              totalVoltage += ina226.getBusVoltage_V();
+
+              // Using getBusPower() / 1000.0 directly from the chip gives you the most accurate power calculation
+              totalPower += (ina226.getBusPower() / 1000.0);
+
+              delay(10);  // Tiny delay between samples to let the sensor refresh
+            }
+
+            // 3. Calculate the averages
+            float averageCurrent_mA = totalCurrent / numSamples;
+            float averageVoltage_V = totalVoltage / numSamples;
+            float averagePower_W = totalPower / numSamples;
+
+            // 4. (Optional) Convert mA to Amps for your final printout
+            float averageCurrent_A = averageCurrent_mA / 1000.0;
+
+            // 3. Print Results
+            Serial.print("\n");
+            Serial.print(speed);
+            Serial.print(",");
+            Serial.print(servoValue);
+            Serial.print(",");
+            Serial.print(averagePower_W);
+            Serial.print(",");
+            Serial.print(reading);
+            Serial.print(",");
+            Serial.print(averageCurrent_A);
+            Serial.print(",");
+            Serial.print(averageVoltage_V);
+          }
+        }
+
+        // End the test
+        myESC.writeMicroseconds(1000);
+
+        if (!quietMode) {
+          Serial.println("=== Test Complete ===");
+        }
 
       } else if (valueString == "load") {
 
@@ -304,7 +391,7 @@ void loop() {
   }
 }  // Closes void loop()
 
-// Handy function to print the command menu sits cleanly outside now
+// Handy function to print the command menu
 void printHelp() {
   Serial.println("\n=== Available Test Bench Commands ===");
   Serial.println("  speed XXXX  - Set speed between 1000 and 1300 (e.g., 'speed 1080')");
